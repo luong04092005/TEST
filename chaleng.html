@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Quản lý quán ăn — Challeng Thai</title>
+  <style>
+    :root{
+      --bg:#faf9f7;
+      --card:#fff;
+      --primary:#ef8354;
+      --accent:#2a9d8f;
+      --muted:#7a7a7a;
+      --danger:#e55934;
+      --glass: rgba(255,255,255,0.8);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter, system-ui, Arial, sans-serif;
+      background:linear-gradient(180deg,var(--bg), #fff);
+      color:#222; min-height:100vh; display:flex; flex-direction:column;
+    }
+    header{
+      background: linear-gradient(90deg,var(--primary), #f7b07a);
+      padding:12px 18px; display:flex; align-items:center; justify-content:space-between;
+      gap:12px; box-shadow:0 4px 14px rgba(0,0,0,0.08);
+      position:sticky; top:0; z-index:50;
+    }
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:48px;height:48px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+    .title{font-weight:800}
+    main{padding:18px; display:grid; grid-template-columns: 320px 1fr; gap:18px; align-items:start;}
+    @media (max-width:950px){ main{grid-template-columns:1fr} .sidebar{order:2} .content{order:1} }
+
+    /* sidebar */
+    .sidebar{background:var(--card); padding:14px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.04);}
+    .sidebar h3{margin:4px 0 12px 0}
+    .btn{background:var(--accent); color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:700}
+    .btn-secondary{background:#fff;border:1px solid #eee;color:#333}
+    .small{font-size:13px;color:var(--muted)}
+    .group{display:flex;gap:8px;flex-wrap:wrap}
+
+    /* content */
+    .content{display:flex;flex-direction:column;gap:12px}
+    .card{background:var(--card); padding:12px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.04)}
+    .flex{display:flex;gap:12px;align-items:center}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px dashed #eee;text-align:left}
+    th{color:var(--muted);font-weight:700;font-size:13px}
+    .menu-card{display:flex;gap:12px;align-items:center}
+    .avatar{width:56px;height:56px;border-radius:8px;background:linear-gradient(90deg,#f3f3f3,#eef7f5);display:flex;align-items:center;justify-content:center;color:#777}
+
+    /* modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:none;align-items:center;justify-content:center;z-index:80}
+    .modal-backdrop.open{display:flex}
+    .modal{width:720px;max-width:95%;background:var(--card);padding:14px;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+
+    /* tables and orders */
+    .table-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
+    .table-item{padding:10px;border-radius:10px;background:var(--glass);text-align:center;border:1px solid #eaeaea;cursor:pointer}
+    .table-item.occupied{background:linear-gradient(90deg,#ffd6c2,#ffece6);border-color:var(--danger)}
+    .badge{background:var(--primary);color:#fff;padding:6px 8px;border-radius:8px;font-weight:700}
+
+    /* form */
+    label{font-weight:700;font-size:13px;margin-bottom:6px;display:block}
+    input[type="text"], input[type="number"], select, textarea{
+      width:100%;padding:8px;border-radius:8px;border:1px solid #eee;background:#fff;
+    }
+
+    footer{padding:12px;text-align:center;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">CT</div>
+      <div>
+        <div class="title">Challeng Thai — Quản lý quán ăn</div>
+        <div class="small">Quản lý thực đơn • bàn • đơn • báo cáo</div>
+      </div>
+    </div>
+
+    <div class="flex">
+      <div class="small" id="storeClock"></div>
+      <button class="btn" onclick="openModal('addMenuModal')">+ Thêm món</button>
+      <button class="btn btn-secondary" onclick="seedDemo()">Seed demo</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Sidebar controls -->
+    <aside class="sidebar">
+      <h3>Bảng điều khiển</h3>
+
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="small">Tổng đơn hôm nay</div>
+            <div style="font-size:18px;font-weight:800" id="statOrders">0</div>
+          </div>
+          <div>
+            <div class="small">Doanh thu</div>
+            <div style="font-size:18px;font-weight:800;color:var(--primary)" id="statRevenue">0₫</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">Quản lý bàn</h4>
+        <div class="table-grid" id="tableGrid">
+          <!-- bàn injected -->
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <input id="newTableName" placeholder="Tên bàn (VD: Bàn 1)" />
+          <button class="btn" onclick="addTable()">Thêm</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px" class="card">
+        <h4 style="margin:0 0 8px 0">Bộ lọc</h4>
+        <div style="display:flex;gap:8px">
+          <input id="qSearch" placeholder="Tìm món / mô tả" oninput="renderMenu()" />
+          <select id="catFilter" onchange="renderMenu()">
+            <option value="">Tất cả danh mục</option>
+          </select>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <section class="content">
+      <!-- Thực đơn -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0">Thực đơn</h3>
+          <div class="small" id="menuCount">0 món</div>
+        </div>
+        <div id="menuList" class="grid"></div>
+      </div>
+
+      <!-- Đơn hàng -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3 style="margin:0">Đơn hàng</h3>
+          <div class="group">
+            <button class="btn" onclick="openModal('orderModal')">Tạo đơn mới</button>
+            <button class="btn btn-secondary" onclick="renderOrders()">Làm mới</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <table id="orderTable">
+            <thead><tr><th>Mã</th><th>Bàn</th><th>Trạng thái</th><th>Tổng</th><th>Thao tác</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Báo cáo -->
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Báo cáo nhanh</h3>
+        <div style="display:flex;gap:12px;align-items:center">
+          <div>
+            <div class="small">Đơn hôm nay</div>
+            <div id="repOrders" style="font-weight:800">0</div>
+          </div>
+          <div>
+            <div class="small">Doanh thu hôm nay</div>
+            <div id="repRevenue" style="font-weight:800;color:var(--primary)">0₫</div>
+          </div>
+          <div style="flex:1">
+            <div class="small">Top món bán chạy</div>
+            <div id="repTop" class="small"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>© <span id="year"></span> Challeng Thai — Demo quản lý quán ăn (local only)</footer>
+
+  <!-- Modal backdrop -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <!-- Add / Edit menu -->
+    <div class="modal" id="addMenuModal" style="display:none">
+      <h3 id="menuModalTitle">Thêm món</h3>
+      <div style="display:grid;gap:8px">
+        <label>Tên món</label><input id="menuName" />
+        <label>Danh mục</label><input id="menuCat" placeholder="ví dụ: Món chính, Tráng miệng" />
+        <label>Giá (VND)</label><input id="menuPrice" type="number" />
+        <label>Mô tả</label><textarea id="menuDesc" rows="3"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeModal('addMenuModal')">Hủy</button>
+          <button class="btn" onclick="saveMenu()">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order modal -->
+    <div class="modal" id="orderModal" style="display:none">
+      <h3>Tạo đơn mới</h3>
+      <div style="display:flex;gap:12px">
+        <div style="width:48%;border-right:1px dashed #eee;padding-right:12px">
+          <label>Chọn bàn (hoặc để trống nếu mang về)</label>
+          <select id="orderTableSelect"><option value="">Mang về</option></select>
+
+          <label style="margin-top:8px">Chọn món</label>
+          <div id="orderMenuList" style="max-height:280px;overflow:auto"></div>
+        </div>
+
+        <div style="width:52%">
+          <label>Giỏ hàng</label>
+          <div id="cartPreview" style="max-height:300px;overflow:auto;border:1px solid #f0f0f0;padding:8px;border-radius:8px"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+            <div><strong>Tổng</strong></div>
+            <div id="orderTotal" style="font-weight:800;color:var(--primary)">0₫</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="closeModal('orderModal')">Hủy</button>
+            <button class="btn" onclick="placeOrder()">Tạo đơn</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Data handling (localStorage) ----------
+    const LS_KEY = 'challeng_thai_v1';
+    const defaultState = {
+      menus: [],      // {id, name, cat, price, desc, sold}
+      tables: [],     // {id, name, status, currentOrderId}
+      orders: []      // {id, tableId, items:[{menuId, qty}], status:'pending'|'served'|'paid', total, created}
+    };
+
+    function loadState(){
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) { saveState(defaultState); return structuredClone(defaultState); }
+      try { return JSON.parse(raw); } catch(e){ saveState(defaultState); return structuredClone(defaultState); }
+    }
+    function saveState(state){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+    let state = loadState();
+
+    // helpers
+    function uid(prefix='id'){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+    function formatPrice(n){ return n.toLocaleString('vi-VN') + '₫'; }
+
+    // ---------- Render menu ----------
+    function renderMenu(){
+      const container = document.getElementById('menuList');
+      const q = document.getElementById('qSearch').value.trim().toLowerCase();
+      const cat = document.getElementById('catFilter').value;
+      const filtered = state.menus.filter(m=>{
+        if(cat && m.cat !== cat) return false;
+        if(q && !(m.name.toLowerCase().includes(q) || (m.desc||'').toLowerCase().includes(q))) return false;
+        return true;
+      });
+      container.innerHTML = '';
+      document.getElementById('menuCount').textContent = filtered.length + ' món';
+      filtered.forEach(m=>{
+        const div = document.createElement('div');
+        div.className = 'card menu-card';
+        div.innerHTML = `
+          <div class="avatar">${m.name.slice(0,1)}</div>
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:800">${m.name}</div>
+              <div style="font-weight:800;color:var(--primary)">${formatPrice(m.price)}</div>
+            </div>
+            <div class="small">${m.cat} • ${m.sold || 0} bán</div>
+            <div style="margin-top:6px;color:#555">${m.desc || ''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn" onclick="quickAdd('${m.id}')">Thêm</button>
+            <button class="btn btn-secondary" onclick="editMenu('${m.id}')">Sửa</button>
+            <button class="btn" style="background:#fff;border:1px solid #f2d6d1;color:var(--danger)" onclick="deleteMenu('${m.id}')">Xóa</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+      // update category filter options
+      const cats = Array.from(new Set(state.menus.map(x=>x.cat).filter(Boolean)));
+      const sel = document.getElementById('catFilter');
+      sel.innerHTML = '<option value="">Tất cả danh mục</option>';
+      cats.forEach(c=> { const o = document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+      // show total menus
+      document.getElementById('menuCount').textContent = state.menus.length + ' món';
+    }
+
+    // ---------- Menu CRUD ----------
+    let editingMenuId = null;
+    function openModal(id){ document.getElementById('modalBackdrop').classList.add('open'); document.getElementById('modalBackdrop').style.display='flex'; const m = document.getElementById(id); m.style.display='block'; }
+    function closeModal(id){ document.getElementById('modalBackdrop').classList.remove('open'); document.getElementById('modalBackdrop').style.display='none'; document.getElementById(id).style.display='none'; editingMenuId = null; clearOrderDraft(); renderMenu(); renderTables(); renderOrders(); renderReports(); }
+
+    function saveMenu(){
+      const name = document.getElementById('menuName').value.trim();
+      const cat = document.getElementById('menuCat').value.trim();
+      const price = Number(document.getElementById('menuPrice').value) || 0;
+      const desc = document.getElementById('menuDesc').value.trim();
+      if(!name){ alert('Vui lòng nhập tên món'); return; }
+      if(editingMenuId){
+        const m = state.menus.find(x=>x.id===editingMenuId);
+        Object.assign(m,{name,cat,price,desc});
+      } else {
+        state.menus.push({ id: uid('m'), name, cat, price, desc, sold:0 });
+      }
+      saveState(state); closeModal('addMenuModal');
+    }
+
+    function editMenu(id){
+      const m = state.menus.find(x=>x.id===id); if(!m) return;
+      editingMenuId = id;
+      document.getElementById('menuModalTitle').textContent = 'Sửa món';
+      document.getElementById('menuName').value = m.name;
+      document.getElementById('menuCat').value = m.cat;
+      document.getElementById('menuPrice').value = m.price;
+      document.getElementById('menuDesc').value = m.desc;
+      openModal('addMenuModal');
+    }
+
+    function deleteMenu(id){
+      if(!confirm('Xác nhận xóa món?')) return;
+      state.menus = state.menus.filter(x=>x.id!==id);
+      saveState(state); renderMenu();
+    }
+
+    // quick add to order draft (open order modal)
+    let orderDraft = {}; // {items: {menuId: qty}, tableId}
+    function quickAdd(menuId){
+      orderDraft.items = orderDraft.items || {};
+      orderDraft.items[menuId] = (orderDraft.items[menuId] || 0) + 1;
+      openOrderModal();
+    }
+
+    // ---------- Tables ----------
+    function renderTables(){
+      const container = document.getElementById('tableGrid');
+      container.innerHTML = '';
+      state.tables.forEach(t=>{
+        const d = document.createElement('div');
+        d.className = 'table-item' + (t.status==='occupied'? ' occupied':'');
+        d.innerHTML = `<div style="font-weight:800">${t.name}</div><div class="small">${t.status}</div>`;
+        d.onclick = ()=>onTableClick(t.id);
+        container.appendChild(d);
+      });
+      // populate order table select too
+      const sel = document.getElementById('orderTableSelect');
+      sel.innerHTML = '<option value="">Mang về</option>';
+      state.tables.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name; sel.appendChild(o); });
+    }
+
+    function addTable(){
+      const name = document.getElementById('newTableName').value.trim();
+      if(!name) return alert('Nhập tên bàn');
+      state.tables.push({ id: uid('t'), name, status:'free', currentOrderId: null });
+      saveState(state); document.getElementById('newTableName').value=''; renderTables(); renderReports();
+    }
+
+    function onTableClick(tableId){
+      const t = state.tables.find(x=>x.id===tableId);
+      if(!t) return;
+      if(t.status === 'free'){
+        // create empty order for table
+        const id = uid('o');
+        const ord = { id, tableId, items:[], status:'pending', total:0, created: new Date().toISOString() };
+        state.orders.push(ord);
+        t.status='occupied'; t.currentOrderId = id;
+        saveState(state); renderTables(); renderOrders();
+      } else {
+        // open order details
+        const ord = state.orders.find(o=>o.id===t.currentOrderId);
+        if(ord) viewOrder(ord.id);
+      }
+    }
+
+    // ---------- Orders ----------
+    function openOrderModal(){
+      // prepare order modal content
+      document.getElementById('orderMenuList').innerHTML = '';
+      state.menus.forEach(m=>{
+        const div = document.createElement('div');
+        div.style.display='flex'; div.style.justifyContent='space-between'; div.style.alignItems='center'; div.style.padding='6px 0';
+        div.innerHTML = `<div><strong>${m.name}</strong><div class="small">${m.cat} • ${formatPrice(m.price)}</div></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" min="0" value="${orderDraft.items && orderDraft.items[m.id] ? orderDraft.items[m.id] : 0}" style="width:64px;padding:6px;border-radius:6px;border:1px solid #eee" onchange="updateDraft('${m.id}',this.value)" />
+          </div>`;
+        document.getElementById('orderMenuList').appendChild(div);
+      });
+
+      renderCartPreview();
+      openModal('orderModal');
+    }
+
+    function updateDraft(menuId, val){
+      const q = Math.max(0,Math.floor(Number(val)||0));
+      orderDraft.items = orderDraft.items || {};
+      if(q === 0) delete orderDraft.items[menuId];
+      else orderDraft.items[menuId] = q;
+      renderCartPreview();
+    }
+
+    function renderCartPreview(){
+      const preview = document.getElementById('cartPreview');
+      preview.innerHTML = '';
+      let total = 0;
+      const items = orderDraft.items || {};
+      const ids = Object.keys(items);
+      if(ids.length===0){ preview.innerHTML = '<div class="small">Giỏ hàng trống</div>'; document.getElementById('orderTotal').textContent = formatPrice(0); return; }
+      ids.forEach(id=>{
+        const m = state.menus.find(x=>x.id===id); const q = items[id];
+        const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.padding='6px 0';
+        row.innerHTML = `<div>${m.name} x ${q}</div><div>${formatPrice(m.price*q)}</div>`;
+        preview.appendChild(row);
+        total += m.price * q;
+      });
+      document.getElementById('orderTotal').textContent = formatPrice(total);
+    }
+
+    function clearOrderDraft(){ orderDraft = {}; renderCartPreview(); }
+
+    function placeOrder(){
+      const tableId = document.getElementById('orderTableSelect').value || null;
+      const itemsObj = orderDraft.items || {};
+      const ids = Object.keys(itemsObj);
+      if(ids.length===0){ alert('Giỏ hàng rỗng'); return; }
+      const items = ids.map(id=>({ menuId:id, qty: itemsObj[id] }));
+      const total = items.reduce((s,it)=> s + (state.menus.find(m=>m.id===it.menuId).price * it.qty), 0);
+      const id = uid('o');
+      const ord = { id, tableId, items, status: tableId? 'pending' : 'paid', total, created: new Date().toISOString() };
+      state.orders.push(ord);
+      // update sold count
+      items.forEach(it=>{
+        const m = state.menus.find(x=>x.id===it.menuId);
+        if(m) m.sold = (m.sold||0) + it.qty;
+      });
+      // if table assigned, mark table occupied
+      if(tableId){
+        const t = state.tables.find(x=>x.id===tableId);
+        if(t){ t.status='occupied'; t.currentOrderId = id; }
+      }
+      saveState(state);
+      clearOrderDraft();
+      closeModal('orderModal');
+      renderOrders(); renderMenu(); renderTables(); renderReports();
+    }
+
+    function renderOrders(){
+      const tbody = document.querySelector('#orderTable tbody');
+      tbody.innerHTML = '';
+      state.orders.slice().reverse().forEach(o=>{
+        const tr = document.createElement('tr');
+        const tableName = o.tableId ? (state.tables.find(t=>t.id===o.tableId)?.name || '—') : 'Mang về';
+        tr.innerHTML = `<td>${o.id}</td>
+          <td>${tableName}</td>
+          <td>${o.status}</td>
+          <td>${formatPrice(o.total)}</td>
+          <td>
+            <button class="btn btn-secondary" onclick="viewOrder('${o.id}')">Xem</button>
+            ${o.status!=='paid' ? `<button class="btn" onclick="payOrder('${o.id}')">Thanh toán</button>` : ''}
+            ${o.status==='paid' ? `<button class="btn" style="background:#fff;border:1px solid #eee" onclick="deleteOrder('${o.id}')">Xóa</button>` : ''}
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function viewOrder(id){
+      const o = state.orders.find(x=>x.id===id); if(!o) return alert('Không tìm thấy đơn');
+      let details = `Đơn: ${o.id}\nBàn: ${o.tableId ? (state.tables.find(t=>t.id===o.tableId)?.name||'') : 'Mang về'}\nTrạng thái: ${o.status}\n\nCác món:\n`;
+      o.items.forEach(it=>{
+        const m = state.menus.find(x=>x.id===it.menuId);
+        details += `- ${m.name} x ${it.qty} = ${formatPrice(m.price * it.qty)}\n`;
+      });
+      details += `\nTổng: ${formatPrice(o.total)}\nTạo: ${new Date(o.created).toLocaleString()}`;
+      alert(details);
+    }
+
+    function payOrder(id){
+      const ord = state.orders.find(x=>x.id===id); if(!ord) return;
+      ord.status = 'paid';
+      // if linked to table, free table
+      if(ord.tableId){
+        const t = state.tables.find(x=>x.id===ord.tableId);
+        if(t){ t.status='free'; t.currentOrderId = null; }
+      }
+      saveState(state); renderOrders(); renderTables(); renderReports(); alert('Thanh toán thành công: ' + formatPrice(ord.total));
+    }
+
+    function deleteOrder(id){
+      if(!confirm('Xóa đơn này?')) return;
+      state.orders = state.orders.filter(x=>x.id!==id);
+      saveState(state); renderOrders(); renderReports();
+    }
+
+    // ---------- Reports ----------
+    function renderReports(){
+      // today's orders and revenue
+      const today = new Date().toISOString().slice(0,10);
+      const todays = state.orders.filter(o=> o.created.slice(0,10) === today && o.status === 'paid');
+      const revenue = todays.reduce((s,o)=>s+o.total,0);
+      document.getElementById('repOrders').textContent = todays.length;
+      document.getElementById('repRevenue').textContent = formatPrice(revenue);
+      document.getElementById('statOrders').textContent = state.orders.filter(o => o.created.slice(0,10) === today).length;
+      document.getElementById('statRevenue').textContent = formatPrice(revenue);
+
+      // top sold
+      const top = state.menus.slice().sort((a,b)=> (b.sold||0) - (a.sold||0)).slice(0,3).map(x=> `${x.name} (${x.sold||0})`).join(' • ');
+      document.getElementById('repTop').textContent = top || 'Chưa có đơn';
+      // overall revenue
+      const totalAll = state.orders.filter(o=> o.status==='paid').reduce((s,o)=>s+o.total,0);
+      document.getElementById('statRevenue').textContent = formatPrice(totalAll);
+    }
+
+    // ---------- Utilities ----------
+    function seedDemo(){
+      if(!confirm('Seed dữ liệu demo? (sẽ ghi đè dữ liệu hiện tại)')) return;
+      state = {
+        menus: [
+          {id: uid('m'), name:'Pad Thai', cat:'Món chính', price:90000, desc:'Mì xào kiểu Thái', sold:10},
+          {id: uid('m'), name:'Tom Yum', cat:'Món nước', price:85000, desc:'Canh Tom Yum cay chua', sold:8},
+          {id: uid('m'), name:'Cơm chiên Thái', cat:'Món chính', price:75000, desc:'Cơm chiên hương vị Thái', sold:5},
+          {id: uid('m'), name:'Gỏi đu đủ', cat:'Salad', price:65000, desc:'Gỏi đu đủ kiểu Thái', sold:6},
+          {id: uid('m'), name:'Trà sả', cat:'Đồ uống', price:25000, desc:'Trà sả tươi', sold:20}
+        ],
+        tables: [
+          {id: uid('t'), name:'Bàn 1', status:'free', currentOrderId:null},
+          {id: uid('t'), name:'Bàn 2', status:'free', currentOrderId:null},
+          {id: uid('t'), name:'Bàn 3', status:'free', currentOrderId:null},
+          {id: uid('t'), name:'Bàn 4', status:'free', currentOrderId:null}
+        ],
+        orders: []
+      };
+      saveState(state); renderMenu(); renderTables(); renderOrders(); renderReports();
+      alert('Seed xong!');
+    }
+
+    function deleteMenu(id){
+      if(!confirm('Xác nhận xóa món?')) return;
+      state.menus = state.menus.filter(x=>x.id!==id);
+      saveState(state); renderMenu(); renderReports();
+    }
+
+    // initial render
+    document.getElementById('year').textContent = new Date().getFullYear();
+    renderMenu(); renderTables(); renderOrders(); renderReports();
+
+    // simple clock
+    setInterval(()=>{ document.getElementById('storeClock').textContent = new Date().toLocaleString(); },1000);
+
+    // close modal when clicking backdrop
+    document.getElementById('modalBackdrop').addEventListener('click', (e)=>{
+      if(e.target.id === 'modalBackdrop'){ closeModal('addMenuModal'); closeModal('orderModal'); }
+    });
+
+    // small UX: open add menu modal clears fields
+    document.querySelectorAll('[onclick^="openModal(\'addMenuModal\')"]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        editingMenuId = null;
+        document.getElementById('menuModalTitle').textContent = 'Thêm món';
+        document.getElementById('menuName').value=''; document.getElementById('menuCat').value=''; document.getElementById('menuPrice').value=''; document.getElementById('menuDesc').value='';
+      });
+    });
+
+    // render orders on load
+    renderOrders();
+    renderReports();
+
+    // Expose some functions to window for inline onclicks used in HTML
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+    window.saveMenu = saveMenu;
+    window.editMenu = editMenu;
+    window.deleteMenu = deleteMenu;
+    window.quickAdd = quickAdd;
+    window.openOrderModal = openOrderModal;
+    window.updateDraft = updateDraft;
+    window.placeOrder = placeOrder;
+    window.renderMenu = renderMenu;
+    window.renderOrders = renderOrders;
+    window.renderTables = renderTables;
+    window.addTable = addTable;
+    window.payOrder = payOrder;
+    window.viewOrder = viewOrder;
+    window.seedDemo = seedDemo;
+    window.clearOrderDraft = clearOrderDraft;
+  </script>
+</body>
+</html>
